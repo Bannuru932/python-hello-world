@@ -1,0 +1,71 @@
+ompile-package-python:
+  image: $PYTHON_IMG
+  stage: build
+    REQ_FILE: requirements.txt
+  script:
+    - pip3 install -r $REQ_FILE
+  tags:
+    - linux
+
+
+code-quality-python:
+  image: $SONAR_4_7_1_IMG
+  allow_failure: true
+  stage: verify-build
+  variables:
+    SONAR_HOST: 'https://sonarqube.com'
+    SONAR_EXCLUSIONS: '**/*.xml, **/*.xlsm, **/*.xsd, **/*.css, **/*.less, **/*.scss'
+    SONAR_BRANCH: master
+    COVERAGE_FILE: $CI_PROJECT_DIR/coverage.xml
+    REQ_FILE: requirements.txt
+    UNIT_TEST_FILE: unit-test/serverTest.py
+  script:
+      pip3 install -r $REQ_FILE
+      coverage run -m --source=. unittest $UNIT_TEST_FILE
+      coverage report
+      coverage xml -i -o $COVERAGE_FILE
+      HTTP_CODE=$(curl --write-out "%{http_code}\n" --silent --output /dev/null --user $SONAR_LOGIN_TOKEN':' $SONAR_HOST/api/qualitygates/project_status?projectKey=$SONAR_PROJECT_NAME)
+      if [ $HTTP_CODE = 404 ]
+      then
+      echo sonar-scanner
+      sonar-scanner -Dsonar.projectKey=$SONAR_PROJECT_NAME -Dsonar.sources=. -Dsonar.host.url=$SONAR_HOST -Dsonar.login=$SONAR_LOGIN_TOKEN -Dsonar.exclusions="$SONAR_EXCLUSIONS" -Dsonar.python.coverage.reportPaths=$COVERAGE_FILE
+      else
+      echo sonar-scanner
+      sonar-scanner -Dsonar.projectKey=$SONAR_PROJECT_NAME -Dsonar.sources=. -Dsonar.host.url=$SONAR_HOST -Dsonar.branch.name=$SONAR_BRANCH -Dsonar.login=$SONAR_LOGIN_TOKEN -Dsonar.exclusions="$SONAR_EXCLUSIONS" -Dsonar.python.coverage.reportPaths=$COVERAGE_FILE
+      fi
+      echo "Validating the status"
+      sleep 20 # waiting for 20 seconds to the server to process the scanned data and get the latest
+      sonar_taskid=$(grep -e "^ceTaskId=" .scannerwork/report-task.txt | sed -e 's/ceTaskId=\(.*\)/\1/g')
+      echo "sonar task id - ${sonar_taskid}"
+      for ((i=1;i<=$SONAR_RETRY;i++));
+      do
+      echo "Retry ${i}"
+      task_status=$(curl -sSf --user $SONAR_LOGIN_TOKEN':' $SONAR_HOST/api/ce/task?id=$sonar_taskid | jq -r '.task.status')
+      echo "Task status - $task_status"
+      [[ "$task_status" != "SUCCESS" ]] || break
+      sleep $SONAR_SLEEP
+      done
+      # fail if analysis task did not complete successfully
+      if [ "$task_status" != "SUCCESS" ]; then echo Analysis task not successful; exit 1; fi
+      sonar_analysisid=$(curl -sSf --user $SONAR_LOGIN_TOKEN':' $SONAR_HOST/api/ce/task?id=$sonar_taskid | jq -r '.task.analysisId')
+      # checking the status of the result from sonar server and fail the job if it fails in sonar server
+      sonar_projectstatus=$(curl -sSf --user $SONAR_LOGIN_TOKEN':' $SONAR_HOST/api/qualitygates/project_status?analysisId=$sonar_analysisid | jq -r '.projectStatus.status')
+      curl -sSf --user $SONAR_LOGIN_TOKEN':' $SONAR_HOST/api/qualitygates/project_status?analysisId=$sonar_analysisid
+      sonar_line_coverage=$(curl -sSf --user $SONAR_LOGIN_TOKEN':' $SONAR_HOST/api/qualitygates/project_status?analysisId=$sonar_analysisid | jq -r '.projectStatus.conditions[].actualValue')
+      echo "Sonar Scan lines coverage value is - ${sonar_line_coverage}"
+      if [ $sonar_projectstatus == "ERROR" ]; then echo "Sonar Scan is failing in Quality Gates" ; exit 1; fi # failing this job if there is any error in the quality gate conditions
+      fi
+  artifacts:
+    expire_in: 1 day
+    paths:
+      - $COVERAGE_FILE
+  rules:
+    - if: $SKIP_SCAN_SONAR =~ /^([tTrRuUeE]).*$/
+      allow_failure: true
+    - if: $CI_COMMIT_BRANCH
+      when: always
+  tags:
+    - linux
+    
+ 
+    
