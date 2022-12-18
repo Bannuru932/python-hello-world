@@ -1,6 +1,7 @@
 compile-package-python:
   image: $PYTHON_IMG
   stage: build
+  variables:
     REQ_FILE: requirements.txt
   script:
     - pip3 install -r $REQ_FILE
@@ -10,7 +11,6 @@ compile-package-python:
 
 code-quality-python:
   image: $SONAR_4_7_1_IMG
-  allow_failure: true
   stage: verify-build
   variables:
     SONAR_HOST: 'https://sonarqube.com'
@@ -67,5 +67,20 @@ code-quality-python:
   tags:
     - linux
     
- 
+ Build-docker
+  image: $ubuntu_image
+  stage: build-docker
+  variables:
+    REQ_FILE: requirements.txt
+    HARBOR_USERNAME: *********
+    HARBOR_SERVER: docker.com
+  script:
+    - pip3 install -r $REQ_FILE
+    - docker login -u $HARBOR_USERNAME --password-stdin $HARBOR_SERVER;
+    - docker build –t DOCKER_IMAGE:0.1.
+    - docker push $DOCKER_IMAGE;
+    - docker logout $HARBOR_SERVER;
+    
+    
+
     
