@@ -1,4 +1,4 @@
-ompile-package-python:
+compile-package-python:
   image: $PYTHON_IMG
   stage: build
     REQ_FILE: requirements.txt
