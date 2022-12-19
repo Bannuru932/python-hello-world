@@ -8,6 +8,7 @@ compile-package-python:
   tags:
     - linux
 
+### SecOPS ####
 
 code-quality-python:
   image: $SONAR_4_7_1_IMG
@@ -55,19 +56,54 @@ code-quality-python:
       echo "Sonar Scan lines coverage value is - ${sonar_line_coverage}"
       if [ $sonar_projectstatus == "ERROR" ]; then echo "Sonar Scan is failing in Quality Gates" ; exit 1; fi # failing this job if there is any error in the quality gate conditions
       fi
-  artifacts:
-    expire_in: 1 day
-    paths:
-      - $COVERAGE_FILE
-  rules:
-    - if: $SKIP_SCAN_SONAR =~ /^([tTrRuUeE]).*$/
-      allow_failure: true
-    - if: $CI_COMMIT_BRANCH
-      when: always
   tags:
     - linux
     
- Build-docker
+Checkmarx-scan:
+  stage: verify-build
+  variables: 
+     username: ******
+     password: ******
+     cx_server: checmarx.com
+     CX_PROJECT_NAME: python-app
+     CX_FOLDER_PATH: *********
+  script:
+    - if [[ "${SKIP_SCAN_CX,,}" =~ "true" ]]; then curl -s $ERROR_LOG > scan-msg.txt; cat scan-msg.txt; exit 1; 
+      else sastctl --vault "$CX_SERVER" "$CX_PROJECT_NAME" "$CX_FOLDER_PATH"; fi
+  tags:
+    - linux
+    
+Blackduck-scan:
+   stage: verify-build
+   image: $JAVA_JDK_11_IMG
+   variables:
+     username: ******
+     password: ******
+     SCM_SCAN_TYPE: generic
+     SCM_PROJECT_NAME: python-app
+     SCM_PROJECT_VERSION: v1
+     SCM_PATH: ******
+  script:
+    - if [[ "${SKIP_SCAN_BLACKDUCK,,}" =~ "true" ]]; then curl -s $ERROR_LOG > scan-msg.txt; cat scan-msg.txt; 
+     exit 1; else scmctl --vault $SCM_SCAN_TYPE $SCM_PROJECT_NAME $SCM_PROJECT_VERSION $SCM_PATH; fi
+  tags:
+    - linux
+
+xray-scan:
+  stage: verify-build
+  image: $
+  variables: 
+    username: ********
+    password: ********
+  script:
+    - curl --ciphers 'DEFAULT:!DH' 'https://artifactory.company.com/artifactory/api/search/artifact' -o $CI_PROJECT_DIR/xray-scan.sh
+    - chmod +x *.sh
+    - if [[ "${path,,}" =~ "true" ]]; then curl -s $ERROR_LOG > scan-msg.txt; cat scan-msg.txt; exit 1; else ./xray-scan.sh $APIKEY; fi
+  tags:
+    - linux 
+
+
+ Build-docker:
   image: $ubuntu_image
   stage: build-docker
   variables:
