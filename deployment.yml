@@ -15,6 +15,6 @@ spec:
     spec:
       containers: # List
         - name: myapp1-container
-          image: stacksimplify/kubenginx:1.0.0
+          image: DOCKER_IMAGE:0.1
           ports:
             - containerPort: 80
