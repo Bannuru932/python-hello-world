@@ -71,16 +71,15 @@ code-quality-python:
   image: $ubuntu_image
   stage: build-docker
   variables:
-    REQ_FILE: requirements.txt
     ACR_Username: *********
     ACR_Password: *********
     ACR_SERVER: docker.com
   script:
     - pip3 install -r $REQ_FILE
     - docker login -u $ACR_Username --password-stdin $ACR_SERVER;
-    - docker build –t DOCKER_IMAGE:0.1.
+    - DOCKER_IMAGE == docker build –t DOCKER_IMAGE:0.1.
     - docker push $DOCKER_IMAGE;
-    - docker logout $HARBOR_SERVER;
+    - docker logout $ACR_SERVER;
   tags:
     - linux
     
@@ -90,11 +89,16 @@ AKS-deployment
  stage : prod
  varibales:
    ACR: ***********
+   DEPLOYMENT_FILE: **************
+   SERVICE_FILE: **************
  script:
     - az login --service-principal -u $CLIENT_ID -p $CLIENT_SECRET --tenant $TENANTID
     - az aks create — resource-group myResourceGroup — name myAKSCluster 
     - az aks show --name $AKS_CLUSTER_NAME --resource-group $ResourceGroup --output table
     - az aks get-credentials --resource-group $ResourceGroup --name $AKS_CLUSTER_NAME
     - kubectl get nodes
-
+    - if [[ -f $DEPLOYMENT_FILE ]]; then kubectl apply -f $DEPLOYMENT_FILE ; fi
+    - if [[ -f $SERVICE_FILE ]]; then kubectl apply -f $SERVICE_FILE ; fi
+    - kubectl get pods
+    
     
