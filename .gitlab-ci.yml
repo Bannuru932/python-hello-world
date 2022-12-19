@@ -72,15 +72,29 @@ code-quality-python:
   stage: build-docker
   variables:
     REQ_FILE: requirements.txt
-    HARBOR_USERNAME: *********
-    HARBOR_SERVER: docker.com
+    ACR_Username: *********
+    ACR_Password: *********
+    ACR_SERVER: docker.com
   script:
     - pip3 install -r $REQ_FILE
-    - docker login -u $HARBOR_USERNAME --password-stdin $HARBOR_SERVER;
+    - docker login -u $ACR_Username --password-stdin $ACR_SERVER;
     - docker build –t DOCKER_IMAGE:0.1.
     - docker push $DOCKER_IMAGE;
     - docker logout $HARBOR_SERVER;
+  tags:
+    - linux
     
-    
+
+AKS-deployment
+ image : $azure-cli-image
+ stage : prod
+ varibales:
+   ACR: ***********
+ script:
+    - az login --service-principal -u $CLIENT_ID -p $CLIENT_SECRET --tenant $TENANTID
+    - az aks create — resource-group myResourceGroup — name myAKSCluster 
+    - az aks show --name $AKS_CLUSTER_NAME --resource-group $ResourceGroup --output table
+    - az aks get-credentials --resource-group $ResourceGroup --name $AKS_CLUSTER_NAME
+    - kubectl get nodes
 
     
