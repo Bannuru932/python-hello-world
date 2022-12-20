@@ -1,5 +1,16 @@
 ### To build & compile the project ###
 
+variables:
+  PYTHON_IMG: python:3.9
+  SONAR_4_7_1_IMG: sonarqube:9.8
+  JAVA_JDK_11_IMG: java:11
+  JFROG_CLI_IMG: jfrog: 6.7
+  ubuntu_image: ubuntu: 13
+  azure-cli-image: azure: 12
+  
+
+
+
 compile-package-python:
   image: $PYTHON_IMG
   stage: build
@@ -139,7 +150,7 @@ artifactory-upload:
 
 xray-scan:
   stage: verify-build
-  image: $
+  image: $JFROG_CLI_IMG
   variables: 
     username: ********
     password: ********
