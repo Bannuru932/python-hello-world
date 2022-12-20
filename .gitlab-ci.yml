@@ -1,14 +1,19 @@
+### To build & compile the project ###
+
 compile-package-python:
   image: $PYTHON_IMG
   stage: build
   variables:
     REQ_FILE: requirements.txt
+    TARGET: /dist
   script:
     - pip3 install -r $REQ_FILE
   tags:
     - linux
 
 ### SecOPS ####
+
+#### To check the code coverage and code smells ###
 
 code-quality-python:
   image: $SONAR_4_7_1_IMG
@@ -20,6 +25,7 @@ code-quality-python:
     COVERAGE_FILE: $CI_PROJECT_DIR/coverage.xml
     REQ_FILE: requirements.txt
     UNIT_TEST_FILE: unit-test/serverTest.py
+    SONAR_LOGIN_TOKEN: *****************
   script:
       pip3 install -r $REQ_FILE
       coverage run -m --source=. unittest $UNIT_TEST_FILE
@@ -58,7 +64,12 @@ code-quality-python:
       fi
   tags:
     - linux
-    
+   
+   
+   
+   
+# # This is to identifies and catalogs all the application related security scans and known vulnerability
+
 Checkmarx-scan:
   stage: verify-build
   variables: 
@@ -73,6 +84,9 @@ Checkmarx-scan:
   tags:
     - linux
     
+    
+# # This is to identifies and catalogs all third-party software components, associated licenses, and known vulnerability
+
 Blackduck-scan:
    stage: verify-build
    image: $JAVA_JDK_11_IMG
@@ -89,6 +103,40 @@ Blackduck-scan:
   tags:
     - linux
 
+
+
+
+
+# # This is to upload the project's published output(deployable) to artifactory
+artifactory-upload:
+  stage: publish-artifact
+  image: $JFROG_CLI_IMG
+  variables:
+    CICD_ARTIFACTORY: https://artifactory.company.com/artifactory/api/search/artifact
+    UPLOAD_FILENAME: $CI_PROJECT_NAME-$CI_COMMIT_SHORT_SHA.tar.gz
+    UPLOAD_PATH: cicd-prod/$CI_PROJECT_PATH
+    username: ********
+    password: ********
+    APIKEY: *******************
+  script:
+    - jfrog rt u $PACKAGE_NAME.tar.gz $CI_PROJECT_NAME/$CI_PROJECT_NAME-$CI_COMMIT_SHA.tar.gz --url=$DCS_DEV_ARTIFACTORY --user=$username --password=$password
+    - cd $CI_PROJECT_DIR/$TARGET
+    - tar -czvf $UPLOAD_FILENAME *
+    - |
+      HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -H "X-JFrog-Art-Api:$APIKEY" -X GET $CICD_ARTIFACTORY/$UPLOAD_PATH/$UPLOAD_FILENAME)
+      if [ $HTTP_CODE = 200 ]
+        then
+          echo "Artifact already exists" && exit 0
+        else
+          echo "Uploading artifact"
+      fi
+    - jfrog rt u $UPLOAD_FILENAME $UPLOAD_PATH/$UPLOAD_FILENAME --url=$CICD_ARTIFACTORY --apikey=$APIKEY
+  tags:
+    - linux
+
+
+# # This is to scan the upload the project's published output(deployable) to artifactory
+
 xray-scan:
   stage: verify-build
   image: $
@@ -101,6 +149,34 @@ xray-scan:
     - if [[ "${path,,}" =~ "true" ]]; then curl -s $ERROR_LOG > scan-msg.txt; cat scan-msg.txt; exit 1; else ./xray-scan.sh $APIKEY; fi
   tags:
     - linux 
+
+
+
+
+
+# ****** Downloading the right package from Artifactory to deploy //No need to pass the credentials ****** #
+# artifactory DOWNLOAD
+.retrieve-artifact:
+  stage: retrieve-artifact
+  image: $JFROG_CLI_IMG
+  variables:
+    CICD_ARTIFACTORY: https://artifactory.company.com/artifactory/api/search/artifact
+    UPLOAD_FILENAME: $CI_PROJECT_NAME-$CI_COMMIT_SHORT_SHA.tar.gz
+    UPLOAD_PATH: cicd-prod/$CI_PROJECT_PATH
+  script:
+    - jfrog rt c --url=$CICD_ARTIFACTORY --apikey=$APIKEY
+    - jfrog rt dl --flat=true $UPLOAD_PATH/$UPLOAD_FILENAME    
+    - mkdir -p $CI_PROJECT_DIR/$TARGET
+    - cd $CI_PROJECT_DIR/$TARGET
+    - tar -xvf $CI_PROJECT_DIR/$UPLOAD_FILENAME
+    - echo "Downloaded from Artifactory"
+  dependencies: []
+  artifacts:
+    expire_in: 1 week
+    paths:
+      - $TARGET
+  tags:
+    - linux
 
 
  Build-docker:
@@ -120,7 +196,9 @@ xray-scan:
     - linux
     
 
-AKS-deployment
+
+
+AKS-deployment: 
  image : $azure-cli-image
  stage : prod
  varibales:
